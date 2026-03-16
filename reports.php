@@ -267,6 +267,78 @@ switch ($reportType) {
             'total_reorder_qty' => array_sum(array_column($data, 'reorder_qty'))
         ];
         break;
+
+    case 'branch_sales_history':
+        $selectedBranch = $branchId;
+        if (!$selectedBranch && !empty($branches)) {
+            $selectedBranch = $branches[0]['branch_id'];
+        }
+        
+        $sql = "SELECT s.sale_id, s.sale_number, s.created_at, s.total_amount, 
+                COUNT(DISTINCT si.product_id) as products_count,
+                SUM(si.quantity) as total_items,
+                u.name as created_by
+                FROM sales s
+                LEFT JOIN sale_items si ON s.sale_id = si.sale_id
+                LEFT JOIN users u ON s.created_by = u.id
+                WHERE s.branch_id = ? AND s.created_at BETWEEN ? AND ?
+                GROUP BY s.sale_id
+                ORDER BY s.created_at DESC";
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$selectedBranch, $dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
+        $data = $stmt->fetchAll();
+        
+        // Daily totals for branch
+        $dailySQL = "SELECT DATE(s.created_at) as sale_date, 
+                    COUNT(s.sale_id) as daily_transactions,
+                    COALESCE(SUM(s.total_amount),0) as daily_total,
+                    COALESCE(AVG(s.total_amount),0) as daily_avg,
+                    COUNT(DISTINCT s.created_by) as staff_active
+                    FROM sales s
+                    WHERE s.branch_id = ? AND s.created_at BETWEEN ? AND ?
+                    GROUP BY DATE(s.created_at)
+                    ORDER BY sale_date DESC";
+        $stmt = $db->prepare($dailySQL);
+        $stmt->execute([$selectedBranch, $dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
+        $detailedBreakdown = $stmt->fetchAll();
+        
+        // Top products for branch
+        $topProductsSQL = "SELECT p.product_id, p.product_name, p.brand, c.category_name,
+                          SUM(si.quantity) as qty_sold, SUM(si.total_price) as total_revenue,
+                          ROUND(SUM(si.total_price)/SUM(si.quantity), 2) as avg_price,
+                          COUNT(DISTINCT s.sale_id) as num_sales
+                          FROM sale_items si
+                          JOIN sales s ON si.sale_id = s.sale_id
+                          JOIN products p ON si.product_id = p.product_id
+                          JOIN categories c ON p.category_id = c.category_id
+                          WHERE s.branch_id = ? AND s.created_at BETWEEN ? AND ?
+                          GROUP BY p.product_id
+                          ORDER BY total_revenue DESC LIMIT 10";
+        $stmt = $db->prepare($topProductsSQL);
+        $stmt->execute([$selectedBranch, $dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
+        $topProducts = $stmt->fetchAll();
+        
+        $branchInfo = [];
+        foreach($branches as $b) {
+            if($b['branch_id'] == $selectedBranch) {
+                $branchInfo = $b;
+                break;
+            }
+        }
+        
+        $summaryStats = [
+            'branch_name' => $branchInfo['branch_name'] ?? 'Unknown Branch',
+            'total_sales' => array_sum(array_column($data, 'total_amount')),
+            'total_transactions' => count($data),
+            'avg_transaction' => count($data) > 0 ? array_sum(array_column($data, 'total_amount')) / count($data) : 0,
+            'total_days' => count($detailedBreakdown),
+            'total_items_sold' => array_sum(array_column($data, 'total_items')),
+            'avg_daily' => count($detailedBreakdown) > 0 ? array_sum(array_column($detailedBreakdown, 'daily_total')) / count($detailedBreakdown) : 0,
+            'top_product' => $topProducts[0] ?? [],
+            'daily_details' => $detailedBreakdown,
+            'top_products' => $topProducts
+        ];
+        break;
 }
 
 require_once __DIR__ . '/views/layouts/header.php';
@@ -318,7 +390,8 @@ require_once __DIR__ . '/views/layouts/header.php';
         'supplier'    => ['icon'=>'bi-truck','label'=>'Supplier Report','color'=>'purple'],
         'daily_sales' => ['icon'=>'bi-graph-up-arrow','label'=>'Daily Sales','color'=>'success'],
         'reorder_level' => ['icon'=>'bi-exclamation-diamond-fill','label'=>'Reorder Level','color'=>'warning'],
-        'branch_sales' => ['icon'=>'bi-shop','label'=>'Branch Performance','color'=>'info'],
+        //'branch_sales' => ['icon'=>'bi-shop','label'=>'Branch Performance','color'=>'info'],
+        'branch_sales_history' => ['icon'=>'bi-building','label'=>'Branch Sales History','color'=>'warning'],
     ];
     foreach ($reportTypes as $type => $info):
         $active = $reportType === $type;
@@ -340,11 +413,11 @@ require_once __DIR__ . '/views/layouts/header.php';
 <div class="content-card mb-4">
     <form method="GET" class="filter-bar">
         <input type="hidden" name="type" value="<?= Helper::e($reportType) ?>">
-        <?php if(in_array($reportType,['daily_sales','branch_sales','reorder_level','grn','supplier'])): ?>
+        <?php if(in_array($reportType,['daily_sales','branch_sales','branch_sales_history','reorder_level','grn','supplier'])): ?>
         <input type="date" name="date_from" class="form-control-dark" value="<?= Helper::e($dateFrom) ?>" style="width:140px;" title="Start Date">
         <input type="date" name="date_to" class="form-control-dark" value="<?= Helper::e($dateTo) ?>" style="width:140px;" title="End Date">
         <?php endif; ?>
-        <?php if(in_array($reportType,['stock','grn','daily_sales','branch_sales','reorder_level'])): ?>
+        <?php if(in_array($reportType,['stock','grn','daily_sales','branch_sales','branch_sales_history','reorder_level'])): ?>
         <select name="branch_id" class="form-select-dark" style="width:160px;">
             <option value="">All Branches</option>
             <?php foreach($branches as $b): ?>
@@ -1005,6 +1078,86 @@ require_once __DIR__ . '/views/layouts/header.php';
             }
         });
     </script>
+    <?php elseif($reportType === 'branch_sales_history' && !empty($summaryStats)): ?>
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="metric-label">💰 Total Sales</div>
+                <div class="metric-value"><?= Helper::formatCurrency($summaryStats['total_sales']) ?></div>
+                <div class="metric-change">📊 <?= $summaryStats['total_transactions'] ?> transactions</div>
+            </div>
+            <div class="metric-card" style="background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(34,197,94,0.05)); border-color: rgba(34,197,94,0.2);">
+                <div class="metric-label" style="color: #22c55e;">📦 Items Sold</div>
+                <div style="font-size:28px;font-weight:800;color:#22c55e;"><?= number_format($summaryStats['total_items_sold']) ?></div>
+                <div class="metric-change" style="color: var(--text-muted);">Avg <?= number_format($summaryStats['total_items_sold'] / max(1, $summaryStats['total_transactions'])) ?> per transaction</div>
+            </div>
+            <div class="metric-card" style="background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(168,85,247,0.05)); border-color: rgba(168,85,247,0.2);">
+                <div class="metric-label" style="color: #a855f7;">💵 Avg Transaction</div>
+                <div style="font-size:28px;font-weight:800;color:#a855f7;"><?= Helper::formatCurrency($summaryStats['avg_transaction']) ?></div>
+                <div class="metric-change" style="color: var(--text-muted);">Daily Avg: <?= Helper::formatCurrency($summaryStats['avg_daily']) ?></div>
+            </div>
+            <div class="metric-card" style="background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(59,130,246,0.05)); border-color: rgba(59,130,246,0.2);">
+                <div class="metric-label" style="color: #3b82f6;">📅 Active Days</div>
+                <div style="font-size:28px;font-weight:800;color:#3b82f6;"><?= $summaryStats['total_days'] ?></div>
+                <div class="metric-change" style="color: var(--text-muted);">Days with sales</div>
+            </div>
+        </div>
+
+        <!-- Charts for Branch Sales History -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <canvas id="branchDailySalesChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="branchDailyTransactionsChart"></canvas>
+            </div>
+        </div>
+
+        <script>
+            const branchDailyData = <?= json_encode($summaryStats['daily_details'] ?? []) ?>;
+            
+            if (branchDailyData.length > 0) {
+                new Chart(document.getElementById('branchDailySalesChart'), {
+                    type: 'line',
+                    data: {
+                        labels: branchDailyData.map(d => new Date(d.sale_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})),
+                        datasets: [{
+                            label: 'Daily Sales Revenue',
+                            data: branchDailyData.map(d => parseFloat(d.daily_total)),
+                            borderColor: '#facc15', backgroundColor: 'rgba(250, 204, 21, 0.1)',
+                            borderWidth: 2.5, fill: true, tension: 0.4, radius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: true, labels: { color: '#9ca3af', font: {size: 12, weight: '700'} } } },
+                        scales: {
+                            y: { beginAtZero: true, grid: {color: '#1f2937'}, ticks: {color: '#9ca3af'} },
+                            x: { grid: {color: '#1f2937'}, ticks: {color: '#9ca3af'} }
+                        }
+                    }
+                });
+                
+                new Chart(document.getElementById('branchDailyTransactionsChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: branchDailyData.map(d => new Date(d.sale_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})),
+                        datasets: [{
+                            label: 'Daily Transactions',
+                            data: branchDailyData.map(d => parseInt(d.daily_transactions)),
+                            backgroundColor: 'rgba(56, 189, 248, 0.8)', borderColor: '#38bdf8', borderWidth: 1.5
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: true, labels: { color: '#9ca3af' } } },
+                        scales: {
+                            y: { beginAtZero: true, grid: {color: '#1f2937'}, ticks: {color: '#9ca3af'} },
+                            x: { grid: {color: '#1f2937'}, ticks: {color: '#9ca3af'} }
+                        }
+                    }
+                });
+            }
+        </script>
     <?php endif; ?>
 
     <div style="overflow-x:auto;">
@@ -1147,6 +1300,74 @@ require_once __DIR__ . '/views/layouts/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+
+    <?php elseif($reportType==='branch_sales_history'): ?>
+        <!-- Branch Sales History Tables -->
+        <div style="margin-top:20px;">
+            <h5 style="color:var(--warning);margin-bottom:15px;">📋 Sales Transactions Detail</h5>
+            <table class="table-dark-custom datatable w-100">
+                <thead><tr><th>Sale #</th><th>Date & Time</th><th>Items</th><th>Total Amount</th><th>Staff</th></tr></thead>
+                <tbody>
+                <?php foreach($data as $r): ?>
+                <tr>
+                    <td><strong style="color:var(--cyan)">#<?= $r['sale_number'] ?></strong></td>
+                    <td><?= Helper::formatDateTime($r['created_at']) ?></td>
+                    <td><span style="background:rgba(56,189,248,0.15);padding:4px 8px;border-radius:4px;"><?= $r['total_items'] ?> items</span></td>
+                    <td style="color:var(--success);font-weight:700;font-size:15px;"><?= Helper::formatCurrency($r['total_amount']) ?></td>
+                    <td style="font-size:13px;color:var(--text-muted);"><?= Helper::e($r['created_by']) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Daily Summary Table -->
+        <div style="margin-top:30px;">
+            <h5 style="color:var(--warning);margin-bottom:15px;">📊 Daily Summary</h5>
+            <table class="table-dark-custom datatable w-100">
+                <thead><tr><th>Date</th><th>Transactions</th><th>Daily Total</th><th>Avg Transaction</th><th>Staff Active</th></tr></thead>
+                <tbody>
+                <?php if(!empty($summaryStats['daily_details'])): ?>
+                    <?php foreach($summaryStats['daily_details'] as $day): ?>
+                    <tr>
+                        <td style="font-weight:600;color:var(--cyan)"><?= Helper::formatDate($day['sale_date']) ?></td>
+                        <td><span style="background:rgba(56,189,248,0.15);padding:4px 12px;border-radius:6px;font-weight:700;"><?= $day['daily_transactions'] ?></span></td>
+                        <td style="color:var(--success);font-weight:700;font-size:15px;"><?= Helper::formatCurrency($day['daily_total']) ?></td>
+                        <td style="color:var(--purple)"><?= Helper::formatCurrency($day['daily_avg']) ?></td>
+                        <td style="color:var(--info)"><?= $day['staff_active'] ?> staff</td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">No daily data available</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Top Products Table -->
+        <div style="margin-top:30px;">
+            <h5 style="color:var(--warning);margin-bottom:15px;">🏆 Top Products</h5>
+            <table class="table-dark-custom datatable w-100">
+                <thead><tr><th>Product</th><th>Brand</th><th>Category</th><th>Qty Sold</th><th>Revenue</th><th>Avg Price</th><th>Sales</th></tr></thead>
+                <tbody>
+                <?php if(!empty($summaryStats['top_products'])): ?>
+                    <?php foreach($summaryStats['top_products'] as $prod): ?>
+                    <tr>
+                        <td><strong><?= Helper::e($prod['product_name']) ?></strong></td>
+                        <td><?= Helper::e($prod['brand']) ?></td>
+                        <td><span class="badge bg-info" style="font-size:11px;"><?= Helper::e($prod['category_name']) ?></span></td>
+                        <td style="color:var(--cyan);font-weight:700;"><?= $prod['qty_sold'] ?></td>
+                        <td style="color:var(--success);font-weight:700;font-size:15px;"><?= Helper::formatCurrency($prod['total_revenue']) ?></td>
+                        <td style="color:var(--warning)"><?= Helper::formatCurrency($prod['avg_price']) ?></td>
+                        <td><?= $prod['num_sales'] ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No product data available</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
     <?php endif; ?>
     </div>
 </div>
