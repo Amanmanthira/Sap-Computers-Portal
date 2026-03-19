@@ -89,6 +89,9 @@
         <a href="/sap-computers/reports.php" class="nav-item <?= ($activePage??'')==='reports'?'active':'' ?>">
             <i class="bi bi-bar-chart-line-fill"></i><span>Reports</span>
         </a>
+        <a href="/sap-computers/customers.php" class="nav-item <?= ($activePage??'')==='customers'?'active':'' ?>">
+            <i class="bi bi-person-vcard-fill"></i><span>Customers & Orders</span>
+        </a>
         <a href="/sap-computers/admin_branch_orders.php" class="nav-item <?= ($activePage??'')==='orders_admin'?'active':'' ?>">
             <i class="bi bi-list-check"></i><span>Branch Orders</span>
         </a>
