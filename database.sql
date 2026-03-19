@@ -296,18 +296,6 @@ INSERT INTO users (name, email, password, role, supplier_id, branch_id) VALUES
 INSERT INTO products (product_name, brand, model, category_id, supplier_id, cost_price, selling_price, reorder_level) VALUES
 ('Inspiron 15 3000', 'Dell', 'INS15-3520', 1, 2, 85000.00, 99500.00, 5),
 ('IdeaPad Slim 3', 'Lenovo', 'IPS3-15ABA7', 1, 3, 78000.00, 92000.00, 5),
-
--- sample sale (one item) 
-INSERT INTO sales (sale_number, branch_id, total_amount, notes, created_by) VALUES
-('SALE-2026-0001',1,99500.00,'Demo sale',1);
-INSERT INTO sale_items (sale_id,product_id,quantity,unit_price,total_price) VALUES
-(LAST_INSERT_ID(),1,1,99500.00,99500.00);
-
--- log movement for the sample sale
-INSERT INTO inventory_movements (product_id,branch_id,type,quantity,reference_id,created_by) VALUES
-(1,1,'Sale',1, (SELECT sale_id FROM sales WHERE sale_number='SALE-2026-0001'), 1);
-
-
 ('HP Pavilion 15', 'HP', 'PAV15-EH3', 1, 4, 92000.00, 108000.00, 3),
 ('VivoBook 15', 'ASUS', 'X1502ZA', 1, 5, 88000.00, 103000.00, 4),
 ('OptiPlex 3000', 'Dell', 'OPT3000-MT', 2, 2, 65000.00, 78000.00, 3),
@@ -320,6 +308,16 @@ INSERT INTO inventory_movements (product_id,branch_id,type,quantity,reference_id
 ('Logitech MK235 Combo', 'Logitech', 'MK235', 5, 1, 2800.00, 3800.00, 10),
 ('Kingston 16GB DDR4', 'Kingston', 'KVR3200S8S6/16', 6, 1, 6500.00, 8500.00, 8),
 ('Samsung 512GB SSD', 'Samsung', '870EVO-512G', 6, 1, 12000.00, 15500.00, 8);
+
+-- sample sale (one item) 
+INSERT INTO sales (sale_number, branch_id, total_amount, notes, created_by) VALUES
+('SALE-2026-0001',1,99500.00,'Demo sale',1);
+INSERT INTO sale_items (sale_id,product_id,quantity,unit_price,total_price) VALUES
+(LAST_INSERT_ID(),1,1,99500.00,99500.00);
+
+-- log movement for the sample sale
+INSERT INTO inventory_movements (product_id,branch_id,type,quantity,reference_id,created_by) VALUES
+(1,1,'Sale',1, (SELECT sale_id FROM sales WHERE sale_number='SALE-2026-0001'), 1);
 
 INSERT INTO stock (product_id, branch_id, quantity) VALUES
 (1,1,12),(1,2,5),(1,3,3),(1,4,7),
