@@ -10,6 +10,7 @@ $supplierModel  = new SupplierModel();
 $productModel   = new ProductModel();
 $grnModel       = new GRNModel();
 $stockModel     = new StockModel();
+$warrantyModel  = new WarrantyModel();
 
 $totalBranches  = $branchModel->count();
 $totalSuppliers = $supplierModel->count();
@@ -21,6 +22,9 @@ $recentGRNs     = $grnModel->getRecent(8);
 $monthlyTotals  = $grnModel->getMonthlyTotals();
 $stockByCategory = $stockModel->getStockByCategory();
 $stockByBranch  = $stockModel->getStockByBranch();
+$pendingWarranties = $warrantyModel->countByStatus('pending');
+$inProgressWarranties = $warrantyModel->countByStatus('in-progress');
+$recentWarranties = $warrantyModel->getRecent(5);
 
 require_once __DIR__ . '/views/layouts/header.php';
 ?>
@@ -95,6 +99,15 @@ require_once __DIR__ . '/views/layouts/header.php';
             <div>
                 <div class="stat-value"><?= $grnModel->countAll() ?></div>
                 <div class="stat-label">Total GRNs</div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="/sap-computers/warranty.php" class="stat-card">
+            <div class="stat-icon purple"><i class="bi bi-shield-check"></i></div>
+            <div>
+                <div class="stat-value" style="color:var(--purple);"><?= $pendingWarranties + $inProgressWarranties ?></div>
+                <div class="stat-label">Active Warranties</div>
             </div>
         </a>
     </div>
@@ -222,6 +235,49 @@ require_once __DIR__ . '/views/layouts/header.php';
                     </div>
                 <?php endforeach; ?>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Warranty Claims -->
+    <div class="col-12">
+        <div class="content-card">
+            <div class="content-card-header">
+                <div class="content-card-title"><i class="bi bi-shield-check"></i> Recent Warranty Claims</div>
+                <a href="/sap-computers/warranty.php" class="btn-outline-cyan" style="font-size:12px;padding:5px 12px;">View All</a>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="table-dark-custom">
+                    <thead>
+                        <tr>
+                            <th>Claim #</th>
+                            <th>Product</th>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Intake Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (!empty($recentWarranties)): ?>
+                        <?php foreach ($recentWarranties as $w): 
+                            $statusColor = ['pending'=>'warning', 'in-progress'=>'cyan', 'completed'=>'success', 'cancelled'=>'danger'];
+                            $color = $statusColor[$w['warranty_status']] ?? 'gray';
+                        ?>
+                        <tr>
+                            <td><a href="/sap-computers/warranty.php?view=<?= $w['warranty_id'] ?>" style="color:var(--cyan);text-decoration:none;"><?= Helper::e($w['warranty_number']) ?></a></td>
+                            <td><?= Helper::e($w['product_name'] . ' — ' . $w['brand']) ?></td>
+                            <td><?= Helper::e($w['customer_name']) ?></td>
+                            <td><span style="background:var(--<?= $color ?>-dim);color:var(--<?= $color ?>);padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;"><?= strtoupper(str_replace('-', ' ', $w['warranty_status'])) ?></span></td>
+                            <td><?= Helper::formatDate($w['intake_date']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">
+                            <i class="bi bi-inbox me-2"></i>No warranty claims yet
+                        </td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

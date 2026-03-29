@@ -85,6 +85,13 @@
         <a href="/sap-computers/pos_history.php" class="nav-item <?= ($activePage??'')==='pos_history'?'active':'' ?>">
             <i class="bi bi-receipt"></i><span>Sales History</span>
         </a>
+        <div class="nav-section-label">Support</div>
+        <a href="/sap-computers/warranty.php" class="nav-item <?= ($activePage??'')==='warranty'?'active':'' ?>">
+            <i class="bi bi-shield-check"></i><span>Warranty Claims</span>
+        </a>
+        <a href="/sap-computers/returns.php" class="nav-item <?= ($activePage??'')==='returns'?'active':'' ?>">
+            <i class="bi bi-arrow-counterclockwise"></i><span>Returns</span>
+        </a>
         <div class="nav-section-label">Admin</div>
         <a href="/sap-computers/reports.php" class="nav-item <?= ($activePage??'')==='reports'?'active':'' ?>">
             <i class="bi bi-bar-chart-line-fill"></i><span>Reports</span>

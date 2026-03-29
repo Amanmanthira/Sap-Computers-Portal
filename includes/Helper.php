@@ -12,11 +12,11 @@ class Helper {
         return 'Rs. ' . number_format($amount, 2);
     }
 
-    public static function formatDate(string $date): string {
+    public static function formatDate(string|null $date): string {
         return $date ? date('d M Y', strtotime($date)) : '-';
     }
 
-    public static function formatDateTime(string $dt): string {
+    public static function formatDateTime(string|null $dt): string {
         return $dt ? date('d M Y, h:i A', strtotime($dt)) : '-';
     }
 

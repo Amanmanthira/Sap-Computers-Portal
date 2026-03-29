@@ -91,14 +91,15 @@ class GRNModel extends Model {
             foreach ($items as $item) {
 
                 $this->execute(
-                    "INSERT INTO grn_items (grn_id,product_id,quantity,unit_cost,total_cost)
-                     VALUES (?,?,?,?,?)",
+                    "INSERT INTO grn_items (grn_id,product_id,quantity,unit_cost,total_cost,serial_number)
+                     VALUES (?,?,?,?,?,?)",
                     [
                         $grn_id,
                         $item['product_id'],
                         $item['quantity'],
                         $item['unit_cost'],
-                        $item['total_cost']
+                        $item['total_cost'],
+                        $item['serial_number'] ?? ''
                     ]
                 );
 
@@ -221,13 +222,16 @@ class SaleModel extends Model {
             $total = array_sum(array_column($items, 'total_price'));
 
             $this->execute(
-                "INSERT INTO sales (sale_number, branch_id, total_amount, notes, created_by)
-                 VALUES (?,?,?,?,?)",
+                "INSERT INTO sales (sale_number, branch_id, customer_name, customer_phone, payment_method, total_amount, notes, created_by)
+                 VALUES (?,?,?,?,?,?,?,?)",
                 [
                     $sale_number,
                     $header['branch_id'],
+                    $header['customer_name'] ?? '',
+                    $header['customer_phone'] ?? '',
+                    $header['payment_method'] ?? 'Cash',
                     $total,
-                    $header['notes'] ?? '',
+                    $header['notes'] ?? 'POS Sale',
                     $header['created_by']
                 ]
             );

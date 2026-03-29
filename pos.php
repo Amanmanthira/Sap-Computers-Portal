@@ -18,12 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
         if (empty(trim($data['cust_name']))) throw new Exception("Customer Name is required.");
         if (strlen(trim($data['cust_phone'])) !== 10) throw new Exception("Valid 10-digit Phone Number is required.");
 
-        $customNotes = "Cust: " . trim($data['cust_name']) . " | Ph: " . trim($data['cust_phone']) . " | Pay: " . $data['pay_method'];
-
         $header = [
-            'branch_id'  => (int)$data['branch_id'],
-            'created_by' => Session::get('user_id'),
-            'notes'      => $customNotes
+            'branch_id'      => (int)$data['branch_id'],
+            'customer_name'  => trim($data['cust_name']),
+            'customer_phone' => trim($data['cust_phone']),
+            'payment_method' => $data['pay_method'],
+            'created_by'     => Session::get('user_id'),
+            'notes'          => 'POS Sale'
         ];
 
         $items = [];

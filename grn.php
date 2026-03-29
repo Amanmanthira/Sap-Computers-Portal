@@ -61,20 +61,21 @@ if (isset($_GET['view'])) {
                 <div class="content-card-header"><div class="content-card-title"><i class="bi bi-list-ul"></i> Items (<?= count($items) ?>)</div></div>
                 <div style="overflow-x:auto;">
                     <table class="table-dark-custom">
-                        <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Qty</th><th>Unit Cost</th><th>Total</th></tr></thead>
+                        <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Serial Number</th><th>Qty</th><th>Unit Cost</th><th>Total</th></tr></thead>
                         <tbody>
                         <?php foreach ($items as $i => $item): ?>
                         <tr>
                             <td style="color:var(--text-muted)"><?= $i+1 ?></td>
                             <td><strong><?= Helper::e($item['product_name']) ?></strong></td>
                             <td><?= Helper::e($item['brand']) ?></td>
+                            <td style="color:var(--text-muted);font-size:12px;"><?= Helper::e($item['serial_number'] ?: '—') ?></td>
                             <td><strong style="color:var(--cyan)"><?= $item['quantity'] ?></strong></td>
                             <td><?= Helper::formatCurrency($item['unit_cost']) ?></td>
                             <td style="color:var(--success)"><?= Helper::formatCurrency($item['total_cost']) ?></td>
                         </tr>
                         <?php endforeach; ?>
                         <tr style="background:var(--navy);">
-                            <td colspan="5" style="text-align:right;font-weight:700;color:var(--text-muted);">GRAND TOTAL</td>
+                            <td colspan="6" style="text-align:right;font-weight:700;color:var(--text-muted);">GRAND TOTAL</td>
                             <td style="color:var(--cyan);font-weight:800;font-size:15px;"><?= Helper::formatCurrency($grn['total_amount']) ?></td>
                         </tr>
                         </tbody>
@@ -110,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'quantity'   => $qty,
                 'unit_cost'  => $cost,
                 'total_cost' => $qty * $cost,
+                'serial_number' => Helper::sanitize($item['serial_number'] ?? ''),
             ];
         }
     }
@@ -299,7 +301,7 @@ function addGRNItem() {
 
     row.innerHTML = `
         <div class="row g-2 align-items-end">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label-dark">Product</label>
                 <select name="items[${grnItemCount}][product_id]" 
                     class="form-select-dark w-100 product-select" 
@@ -310,7 +312,15 @@ function addGRNItem() {
             </div>
 
             <div class="col-md-2">
-                <label class="form-label-dark">Quantity</label>
+                <label class="form-label-dark">Serial Number</label>
+                <input type="text" 
+                    name="items[${grnItemCount}][serial_number]" 
+                    class="form-control-dark w-100"
+                    placeholder="Serial #">
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label-dark">Qty</label>
                 <input type="number" 
                     name="items[${grnItemCount}][quantity]" 
                     class="form-control-dark w-100 qty-input"
@@ -328,7 +338,7 @@ function addGRNItem() {
                     onchange="calcRowTotal(${grnItemCount})">
             </div>
 
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label-dark">Total</label>
                 <input type="text" 
                     id="rowTotal_${grnItemCount}" 
@@ -336,7 +346,7 @@ function addGRNItem() {
                     readonly value="Rs. 0.00">
             </div>
 
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <button type="button" class="btn-ghost w-100" onclick="removeGRNItem(${grnItemCount})">
                     <i class="bi bi-trash3"></i> Remove
                 </button>
